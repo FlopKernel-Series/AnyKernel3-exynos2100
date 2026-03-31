@@ -68,6 +68,23 @@ apply_bpf_spoof() {
   $BIN/magiskboot hexpatch "$AKHOME/Image" "$hex_2" "$target_hex" >/dev/null 2>&1
 }
 
+apply_mass_storage_hack() {
+  local mode=$1
+  local hex_0="6d6173735f73746f726167655f6861636b3d30"
+  local hex_1="6d6173735f73746f726167655f6861636b3d31"
+  local target_hex="$hex_0"
+
+  case "$mode" in
+    1) target_hex="$hex_1" ;;
+    *) target_hex="$hex_0" ;;
+  esac
+
+  [ -f "$AKHOME/Image" ] || return 0
+
+  $BIN/magiskboot hexpatch "$AKHOME/Image" "$hex_0" "$target_hex" >/dev/null 2>&1
+  $BIN/magiskboot hexpatch "$AKHOME/Image" "$hex_1" "$target_hex" >/dev/null 2>&1
+}
+
 check_bpf_spoofing() {
   if [ ! -f "$AKHOME/bpf_spoof.conf" ]; then
     return 0
@@ -171,6 +188,23 @@ if [ "$cache_mounted" -eq 1 ] && [ -f /cache/fk_feat ]; then
   elif grep -q "uname_bpf_spoof" /cache/fk_feat 2>/dev/null; then
     feature_ok "Enabling feature: uname BPF spoof (mode 1)"
     apply_bpf_spoof 1
+  fi
+
+  if grep -q "mass_storage_hack=" /cache/fk_feat 2>/dev/null; then
+    val=$(grep -o 'mass_storage_hack=[0-9]*' /cache/fk_feat | head -n1 | cut -d= -f2)
+    if [ "$val" = "1" ]; then
+      feature_ok "Mass storage hack: Enabled"
+      feature_info "Patching kernel for mass storage hack..."
+      feature_info "mass_storage_hack=0 -> mass_storage_hack=1"
+    else
+      feature_info "Mass storage hack: Disabled"
+    fi
+    apply_mass_storage_hack "$val"
+  elif grep -q "mass_storage_hack" /cache/fk_feat 2>/dev/null; then
+    feature_ok "Mass storage hack: Enabled"
+    feature_info "Patching kernel for mass storage hack..."
+    feature_info "mass_storage_hack=0 -> mass_storage_hack=1"
+    apply_mass_storage_hack 1
   fi
 fi
 
