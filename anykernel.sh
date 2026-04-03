@@ -85,6 +85,26 @@ apply_mass_storage_hack() {
   $BIN/magiskboot hexpatch "$AKHOME/Image" "$hex_1" "$target_hex" >/dev/null 2>&1
 }
 
+apply_selinux_mode() {
+  local mode=$1
+  local hex_0="73656c696e75785f6d6f64653d30"
+  local hex_1="73656c696e75785f6d6f64653d31"
+  local hex_2="73656c696e75785f6d6f64653d32"
+  local target_hex="$hex_0"
+
+  case "$mode" in
+    1) target_hex="$hex_1" ;;
+    2) target_hex="$hex_2" ;;
+    *) target_hex="$hex_0" ;;
+  esac
+
+  [ -f "$AKHOME/Image" ] || return 0
+
+  $BIN/magiskboot hexpatch "$AKHOME/Image" "$hex_0" "$target_hex" >/dev/null 2>&1
+  $BIN/magiskboot hexpatch "$AKHOME/Image" "$hex_1" "$target_hex" >/dev/null 2>&1
+  $BIN/magiskboot hexpatch "$AKHOME/Image" "$hex_2" "$target_hex" >/dev/null 2>&1
+}
+
 check_bpf_spoofing() {
   if [ ! -f "$AKHOME/bpf_spoof.conf" ]; then
     return 0
@@ -205,6 +225,20 @@ if [ "$cache_mounted" -eq 1 ] && [ -f /cache/fk_feat ]; then
     feature_info "Patching kernel for mass storage hack..."
     feature_info "mass_storage_hack=0 -> mass_storage_hack=1"
     apply_mass_storage_hack 1
+  fi
+
+  if grep -q "selinux_mode=" /cache/fk_feat 2>/dev/null; then
+    val=$(grep -o 'selinux_mode=[0-9]*' /cache/fk_feat | head -n1 | cut -d= -f2)
+    case "$val" in
+      1)
+        feature_ok "Restoring feature: Force SELinux mode (Always Enforcing)"
+        apply_selinux_mode "$val"
+        ;;
+      2)
+        feature_ok "Restoring feature: Force SELinux mode (Always Permissive)"
+        apply_selinux_mode "$val"
+        ;;
+    esac
   fi
 fi
 
