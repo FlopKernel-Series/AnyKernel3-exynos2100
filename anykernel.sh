@@ -105,6 +105,23 @@ apply_selinux_mode() {
   $BIN/magiskboot hexpatch "$AKHOME/Image" "$hex_2" "$target_hex" >/dev/null 2>&1
 }
 
+apply_init_protection() {
+  local mode=$1
+  local hex_0="696e69745f70726f74656374696f6e3d30"
+  local hex_1="696e69745f70726f74656374696f6e3d31"
+  local target_hex="$hex_1"
+
+  case "$mode" in
+    0) target_hex="$hex_0" ;;
+    *) target_hex="$hex_1" ;;
+  esac
+
+  [ -f "$AKHOME/Image" ] || return 0
+
+  $BIN/magiskboot hexpatch "$AKHOME/Image" "$hex_0" "$target_hex" >/dev/null 2>&1
+  $BIN/magiskboot hexpatch "$AKHOME/Image" "$hex_1" "$target_hex" >/dev/null 2>&1
+}
+
 check_bpf_spoofing() {
   if [ ! -f "$AKHOME/bpf_spoof.conf" ]; then
     return 0
@@ -237,6 +254,19 @@ if [ "$cache_mounted" -eq 1 ] && [ -f /cache/fk_feat ]; then
       2)
         feature_ok "Restoring feature: Force SELinux mode (Always Permissive)"
         apply_selinux_mode "$val"
+        ;;
+    esac
+  fi
+
+  if grep -q "init_protection=" /cache/fk_feat 2>/dev/null; then
+    val=$(grep -o 'init_protection=[0-9]*' /cache/fk_feat | head -n1 | cut -d= -f2)
+    case "$val" in
+      0)
+        feature_ok "Restoring feature: Init protection (Disabled)"
+        apply_init_protection "$val"
+        ;;
+      1)
+        apply_init_protection "$val"
         ;;
     esac
   fi
