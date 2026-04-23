@@ -14,7 +14,7 @@ device.name1=r9s
 device.name2=o1s
 device.name3=p3s
 device.name4=t2s
-supported.versions=12.0-16.0
+supported.versions=11.0-16.0
 supported.patchlevels=
 supported.vendorpatchlevels=
 '; } # end properties
