@@ -4,7 +4,7 @@
 ### AnyKernel setup
 # global properties
 properties() { '
-kernel.string=FloppyKernel v1.0 for Exynos 2100 devices by @Flopster101
+kernel.string=FloppyKernel v1.0.1 for Exynos 2100 devices by @Flopster101
 do.devicecheck=1
 do.modules=0
 do.systemless=1
