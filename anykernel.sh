@@ -105,6 +105,47 @@ apply_selinux_mode() {
   $BIN/magiskboot hexpatch "$AKHOME/Image" "$hex_2" "$target_hex" >/dev/null 2>&1
 }
 
+apply_aosp_mode() {
+  local mode=$1
+  local hex_0="616f73705f6d6f64653d30"
+  local hex_1="616f73705f6d6f64653d31"
+  local target_hex="$hex_0"
+
+  case "$mode" in
+    1) target_hex="$hex_1" ;;
+    *) target_hex="$hex_0" ;;
+  esac
+
+  [ -f "$AKHOME/Image" ] || return 0
+
+  $BIN/magiskboot hexpatch "$AKHOME/Image" "$hex_0" "$target_hex" >/dev/null 2>&1
+  $BIN/magiskboot hexpatch "$AKHOME/Image" "$hex_1" "$target_hex" >/dev/null 2>&1
+}
+
+# Detect ROM type (OneUI vs AOSP) using the same criteria as Floppy1280:
+# Stock OneUI vendors ship Samsung overlay packages that AOSP-based ROMs lack.
+detect_aosp_mode() {
+  if [ "$cache_mounted" -eq 1 ] && [ -f /cache/fk_feat ] && \
+     grep -q "aosp_mode=" /cache/fk_feat 2>/dev/null; then
+    val=$(grep -o 'aosp_mode=[0-9]*' /cache/fk_feat | head -n1 | cut -d= -f2)
+    feature_ok "aosp_mode override from /cache/fk_feat: $val"
+    apply_aosp_mode "$val"
+    return 0
+  fi
+
+  if [ ! -f /vendor/build.prop ]; then
+    mount -o ro /vendor 2>/dev/null || mount -o ro /dev/block/mapper/vendor /vendor 2>/dev/null
+  fi
+
+  if [ -d /vendor/overlay/ConnectivityOverlay ] || [ -d /vendor/overlay/TetheringOverlay ]; then
+    feature_info "OneUI (Stock) ROM detected -> aosp_mode=0"
+    apply_aosp_mode 0
+  else
+    feature_ok "AOSP-based ROM detected -> aosp_mode=1"
+    apply_aosp_mode 1
+  fi
+}
+
 apply_init_protection() {
   local mode=$1
   local hex_0="696e69745f70726f74656374696f6e3d30"
@@ -271,6 +312,9 @@ if [ "$cache_mounted" -eq 1 ] && [ -f /cache/fk_feat ]; then
     esac
   fi
 fi
+
+# Detect ROM type and patch aosp_mode accordingly
+detect_aosp_mode
 
 # Run BPF spoof detection
 check_bpf_spoofing
