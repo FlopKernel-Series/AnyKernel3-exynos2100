@@ -109,39 +109,39 @@ apply_aosp_mode() {
   local mode=$1
   local hex_0="616f73705f6d6f64653d30"
   local hex_1="616f73705f6d6f64653d31"
-  local target_hex="$hex_0"
 
-  case "$mode" in
-    1) target_hex="$hex_1" ;;
-    *) target_hex="$hex_0" ;;
-  esac
-
+  [ "$mode" = "1" ] || return 0
   [ -f "$AKHOME/Image" ] || return 0
 
-  $BIN/magiskboot hexpatch "$AKHOME/Image" "$hex_0" "$target_hex" >/dev/null 2>&1
-  $BIN/magiskboot hexpatch "$AKHOME/Image" "$hex_1" "$target_hex" >/dev/null 2>&1
+  $BIN/magiskboot hexpatch "$AKHOME/Image" "$hex_0" "$hex_1" >/dev/null 2>&1
 }
 
-# Detect ROM type (OneUI vs AOSP) using the same criteria as Floppy1280:
-# Stock OneUI vendors ship Samsung overlay packages that AOSP-based ROMs lack.
 detect_aosp_mode() {
   if [ "$cache_mounted" -eq 1 ] && [ -f /cache/fk_feat ] && \
      grep -q "aosp_mode=" /cache/fk_feat 2>/dev/null; then
     val=$(grep -o 'aosp_mode=[0-9]*' /cache/fk_feat | head -n1 | cut -d= -f2)
-    feature_ok "aosp_mode override from /cache/fk_feat: $val"
+    ui_print "[-] ROM mode override: aosp_mode=$val"
     apply_aosp_mode "$val"
     return 0
   fi
 
-  if [ ! -f /vendor/build.prop ]; then
+  if ! grep -q ' /vendor ' /proc/mounts 2>/dev/null; then
     mount -o ro /vendor 2>/dev/null || mount -o ro /dev/block/mapper/vendor /vendor 2>/dev/null
   fi
 
+  vendor_src=$(grep ' /vendor ' /proc/mounts 2>/dev/null | tail -n1 | awk '{print $1}')
+  case "$vendor_src" in
+    /dev/block/*) ;;
+    *)
+      ui_print "[-] ROM mode: OneUI or stock-based (vendor not block-mounted)"
+      return 0
+      ;;
+  esac
+
   if [ -d /vendor/overlay/ConnectivityOverlay ] || [ -d /vendor/overlay/TetheringOverlay ]; then
-    feature_info "OneUI (Stock) ROM detected -> aosp_mode=0"
-    apply_aosp_mode 0
+    ui_print "[-] ROM mode: OneUI or stock-based"
   else
-    feature_ok "AOSP-based ROM detected -> aosp_mode=1"
+    ui_print "[-] ROM mode: AOSP"
     apply_aosp_mode 1
   fi
 }
