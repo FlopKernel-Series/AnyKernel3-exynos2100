@@ -44,9 +44,14 @@ print_blank_once() {
     printed_blank=1
   fi
 }
-feature_ok() { print_blank_once; ui_print "[*] $1"; }
-feature_info() { print_blank_once; ui_print "[*] $1"; }
-feature_warn() { print_blank_once; ui_print "[!] $1"; }
+log_rom()  { print_blank_once; ui_print "[ROM] $1"; }
+log_feat() { print_blank_once; ui_print "[FK]  $1"; }
+log_warn() { print_blank_once; ui_print "[!]   $1"; }
+
+# Keep legacy aliases used by check_bpf_spoofing
+feature_ok()   { log_feat "$1"; }
+feature_info() { log_feat "$1"; }
+feature_warn() { log_warn "$1"; }
 
 apply_bpf_spoof() {
   local mode=$1
@@ -120,7 +125,7 @@ detect_aosp_mode() {
   if [ "$cache_mounted" -eq 1 ] && [ -f /cache/fk_feat ] && \
      grep -q "aosp_mode=" /cache/fk_feat 2>/dev/null; then
     val=$(grep -o 'aosp_mode=[0-9]*' /cache/fk_feat | head -n1 | cut -d= -f2)
-    ui_print "[-] ROM mode override: aosp_mode=$val"
+    log_rom "Vendor type: override (aosp_mode=$val)"
     apply_aosp_mode "$val"
     return 0
   fi
@@ -133,15 +138,15 @@ detect_aosp_mode() {
   case "$vendor_src" in
     /dev/block/*) ;;
     *)
-      ui_print "[-] ROM mode: OneUI or stock-based (vendor not block-mounted)"
+      log_rom "Vendor type: OneUI or stock-based (vendor not block-mounted)"
       return 0
       ;;
   esac
 
   if [ -d /vendor/overlay/ConnectivityOverlay ] || [ -d /vendor/overlay/TetheringOverlay ]; then
-    ui_print "[-] ROM mode: OneUI or stock-based"
+    log_rom "Vendor type: OneUI or stock-based"
   else
-    ui_print "[-] ROM mode: AOSP"
+    log_rom "Vendor type: AOSP"
     apply_aosp_mode 1
   fi
 }
@@ -169,7 +174,7 @@ check_bpf_spoofing() {
   fi
 
   if [ "$cache_mounted" -eq 1 ] && [ -f /cache/fk_feat ] && grep -q "uname_bpf_spoof" /cache/fk_feat 2>/dev/null; then
-    feature_info "BpfSpoof already configured in /cache/fk_feat, skipping detection."
+    log_feat "BPF spoof: already set in fk_feat, skipping detection"
     return 0
   fi
 
@@ -235,12 +240,12 @@ check_bpf_spoofing() {
   done < "$AKHOME/bpf_spoof.conf"
 
   if [ -n "$best_entry" ]; then
-    feature_info "$best_message"
+    log_feat "$best_message"
     if [ "$best_action" = "auto" ]; then
-      feature_ok "Enabling feature: uname BPF spoof (mode $best_mode)"
+      log_feat "BPF spoof: auto-enabled (mode $best_mode)"
       apply_bpf_spoof "$best_mode"
     else
-      feature_warn "You might need to manually enable BpfSpoof (recommended mode: $best_mode)"
+      log_warn "BPF spoof: manual enable recommended (mode $best_mode)"
     fi
   fi
 }
@@ -261,27 +266,23 @@ fi
 if [ "$cache_mounted" -eq 1 ] && [ -f /cache/fk_feat ]; then
   if grep -q "uname_bpf_spoof=" /cache/fk_feat 2>/dev/null; then
     val=$(grep -o 'uname_bpf_spoof=[0-9]*' /cache/fk_feat | head -n1 | cut -d= -f2)
-    feature_ok "Enabling feature: uname BPF spoof (mode $val)"
+    log_feat "BPF spoof: mode $val"
     apply_bpf_spoof "$val"
   elif grep -q "uname_bpf_spoof" /cache/fk_feat 2>/dev/null; then
-    feature_ok "Enabling feature: uname BPF spoof (mode 1)"
+    log_feat "BPF spoof: mode 1"
     apply_bpf_spoof 1
   fi
 
   if grep -q "mass_storage_hack=" /cache/fk_feat 2>/dev/null; then
     val=$(grep -o 'mass_storage_hack=[0-9]*' /cache/fk_feat | head -n1 | cut -d= -f2)
     if [ "$val" = "1" ]; then
-      feature_ok "Mass storage hack: Enabled"
-      feature_info "Patching kernel for mass storage hack..."
-      feature_info "mass_storage_hack=0 -> mass_storage_hack=1"
+      log_feat "Mass storage hack: enabled"
     else
-      feature_info "Mass storage hack: Disabled"
+      log_feat "Mass storage hack: disabled"
     fi
     apply_mass_storage_hack "$val"
   elif grep -q "mass_storage_hack" /cache/fk_feat 2>/dev/null; then
-    feature_ok "Mass storage hack: Enabled"
-    feature_info "Patching kernel for mass storage hack..."
-    feature_info "mass_storage_hack=0 -> mass_storage_hack=1"
+    log_feat "Mass storage hack: enabled"
     apply_mass_storage_hack 1
   fi
 
@@ -289,11 +290,11 @@ if [ "$cache_mounted" -eq 1 ] && [ -f /cache/fk_feat ]; then
     val=$(grep -o 'selinux_mode=[0-9]*' /cache/fk_feat | head -n1 | cut -d= -f2)
     case "$val" in
       1)
-        feature_ok "Restoring feature: Force SELinux mode (Always Enforcing)"
+        log_feat "SELinux mode: always enforcing"
         apply_selinux_mode "$val"
         ;;
       2)
-        feature_ok "Restoring feature: Force SELinux mode (Always Permissive)"
+        log_feat "SELinux mode: always permissive"
         apply_selinux_mode "$val"
         ;;
     esac
@@ -303,7 +304,7 @@ if [ "$cache_mounted" -eq 1 ] && [ -f /cache/fk_feat ]; then
     val=$(grep -o 'init_protection=[0-9]*' /cache/fk_feat | head -n1 | cut -d= -f2)
     case "$val" in
       0)
-        feature_ok "Restoring feature: Init protection (Disabled)"
+        log_feat "Init protection: disabled"
         apply_init_protection "$val"
         ;;
       1)
