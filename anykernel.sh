@@ -134,14 +134,21 @@ detect_aosp_mode() {
     mount -o ro /vendor 2>/dev/null || mount -o ro /dev/block/mapper/vendor /vendor 2>/dev/null
   fi
 
-  vendor_src=$(grep ' /vendor ' /proc/mounts 2>/dev/null | tail -n1 | awk '{print $1}')
-  case "$vendor_src" in
-    /dev/block/*) ;;
-    *)
-      log_rom "Vendor type: OneUI or stock-based (vendor not block-mounted)"
-      return 0
-      ;;
-  esac
+  fallback_oneui=0
+  if [ ! -f /vendor/build.prop ]; then
+    fallback_oneui=1
+  else
+    vendor_src=$(grep ' /vendor ' /proc/mounts 2>/dev/null | tail -n1 | awk '{print $1}')
+    case "$vendor_src" in
+      /dev/block/*) ;;
+      *) fallback_oneui=1 ;;
+    esac
+  fi
+
+  if [ "$fallback_oneui" -eq 1 ]; then
+    log_rom "Vendor type: OneUI or stock-based"
+    return 0
+  fi
 
   if [ -d /vendor/overlay/ConnectivityOverlay ] || [ -d /vendor/overlay/TetheringOverlay ]; then
     log_rom "Vendor type: OneUI or stock-based"
