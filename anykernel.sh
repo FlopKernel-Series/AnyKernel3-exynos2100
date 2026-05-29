@@ -150,7 +150,19 @@ detect_aosp_mode() {
     return 0
   fi
 
-  if [ -d /vendor/overlay/ConnectivityOverlay ] || [ -d /vendor/overlay/TetheringOverlay ]; then
+  oneui_vendor=0
+  if [ -d /vendor/overlay/ConnectivityOverlay ] || [ -d /vendor/overlay/TetheringOverlay ] || [ -d /vendor/saiv ]; then
+    oneui_vendor=1
+  else
+    for overlay_dir in /vendor/overlay_99*; do
+      if [ -d "$overlay_dir" ]; then
+        oneui_vendor=1
+        break
+      fi
+    done
+  fi
+
+  if [ "$oneui_vendor" -eq 1 ]; then
     log_rom "Vendor type: OneUI or stock-based"
   else
     log_rom "Vendor type: AOSP"
