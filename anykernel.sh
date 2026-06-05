@@ -187,6 +187,23 @@ apply_init_protection() {
   $BIN/magiskboot hexpatch "$AKHOME/Image" "$hex_1" "$target_hex" >/dev/null 2>&1
 }
 
+apply_usb_sl_disable() {
+  local mode=$1
+  local hex_0="7573625f736c5f64697361626c653d30"
+  local hex_1="7573625f736c5f64697361626c653d31"
+  local target_hex="$hex_0"
+
+  case "$mode" in
+    1) target_hex="$hex_1" ;;
+    *) target_hex="$hex_0" ;;
+  esac
+
+  [ -f "$AKHOME/Image" ] || return 0
+
+  $BIN/magiskboot hexpatch "$AKHOME/Image" "$hex_0" "$target_hex" >/dev/null 2>&1
+  $BIN/magiskboot hexpatch "$AKHOME/Image" "$hex_1" "$target_hex" >/dev/null 2>&1
+}
+
 check_bpf_spoofing() {
   if [ ! -f "$AKHOME/bpf_spoof.conf" ]; then
     return 0
@@ -328,6 +345,19 @@ if [ "$cache_mounted" -eq 1 ] && [ -f /cache/fk_feat ]; then
         ;;
       1)
         apply_init_protection "$val"
+        ;;
+    esac
+  fi
+
+  if grep -q "usb_sl_disable=" /cache/fk_feat 2>/dev/null; then
+    val=$(grep -o 'usb_sl_disable=[0-9]*' /cache/fk_feat | head -n1 | cut -d= -f2)
+    case "$val" in
+      1)
+        log_feat "USB SL Disable: override"
+        apply_usb_sl_disable "$val"
+        ;;
+      0)
+        apply_usb_sl_disable "$val"
         ;;
     esac
   fi
