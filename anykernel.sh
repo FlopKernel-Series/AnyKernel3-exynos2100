@@ -276,11 +276,30 @@ check_bpf_spoofing() {
   done < "$AKHOME/bpf_spoof.conf"
 
   if [ -n "$best_entry" ]; then
-    log_feat "$best_message"
     if [ "$best_action" = "auto" ]; then
-      log_feat "BPF spoof: auto-enabled (mode $best_mode)"
-      apply_bpf_spoof "$best_mode"
+      # Gate auto uname spoofing on One UI version
+      oneui_ver=""
+      for _bp in /system/system/build.prop /system/build.prop; do
+        if [ -f "$_bp" ]; then
+          _v=$(grep -m1 '^ro\.build\.version\.oneui=' "$_bp" 2>/dev/null | cut -d= -f2 | tr -d '[:space:]')
+          if [ -n "$_v" ]; then
+            oneui_ver="$_v"
+            break
+          fi
+        fi
+      done
+
+      if [ -z "$oneui_ver" ]; then
+        # Property not present - not a One UI ROM, skip
+        :
+      elif [ "$oneui_ver" -ge 80500 ] 2>/dev/null; then
+        log_feat "$best_message"
+        log_feat "BPF spoof: auto-enabled for One UI 8.5+ (ver=$oneui_ver, mode $best_mode)"
+        apply_bpf_spoof "$best_mode"
+      fi
+      # oneui_ver <= 80000 (or any other lower value): skip
     else
+      log_feat "$best_message"
       log_warn "BPF spoof: manual enable recommended (mode $best_mode)"
     fi
   fi
