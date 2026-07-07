@@ -95,7 +95,8 @@ def create_zip_from_directory(directory, zip_path, exclude_patterns=None):
                     zipf.write(file_path, arcname)
 
 
-def process_bool_type(flag, feature_name, comment, script_dir, patcher_template, output_dir, date):
+def process_bool_type(flag, feature_name, comment, default_value,
+                      script_dir, patcher_template, output_dir, date):
     """Process a boolean type feature and generate enable/disable zips."""
     print(f"Processing bool: {flag} -> {feature_name}")
 
@@ -123,6 +124,8 @@ def process_bool_type(flag, feature_name, comment, script_dir, patcher_template,
     (enable_work_dir / "patcher_action").write_text("enable")
     (enable_work_dir / "patcher_feature").write_text(flag)
     (enable_work_dir / "patcher_feature_name").write_text(feature_name)
+    (enable_work_dir / "patcher_default_value").write_text(str(default_value))
+    (enable_work_dir / "patcher_value").write_text("1")
     if comment:
         (enable_work_dir / "patcher_comment").write_text(comment)
     (enable_work_dir / "patcher_patch_old").write_text(patch_old_enable)
@@ -152,6 +155,8 @@ def process_bool_type(flag, feature_name, comment, script_dir, patcher_template,
     (disable_work_dir / "patcher_action").write_text("disable")
     (disable_work_dir / "patcher_feature").write_text(flag)
     (disable_work_dir / "patcher_feature_name").write_text(feature_name)
+    (disable_work_dir / "patcher_default_value").write_text(str(default_value))
+    (disable_work_dir / "patcher_value").write_text("0")
     if comment:
         (disable_work_dir / "patcher_comment").write_text(comment)
     (disable_work_dir / "patcher_patch_old").write_text(patch_old_disable)
@@ -231,7 +236,9 @@ def process_select_type(flag, feature_name, general_desc, values, script_dir, pa
     print()
 
 
-def process_int_type(flag, range_min, range_max, feature_name, general_desc, values, script_dir, patcher_template, output_dir, date):
+def process_int_type(flag, range_min, range_max, default_value, feature_name,
+                     general_desc, values, script_dir, patcher_template,
+                     output_dir, date):
     """Process an integer type feature and generate value zips plus disabler."""
     print(f"Processing int: {flag} -> {feature_name} (range: {range_min}-{range_max})")
 
@@ -278,6 +285,7 @@ def process_int_type(flag, range_min, range_max, feature_name, general_desc, val
         (value_work_dir / "patcher_general_desc").write_text(general_desc)
         (value_work_dir / "patcher_value_desc").write_text(val_desc)
         (value_work_dir / "patcher_value").write_text(val_value)
+        (value_work_dir / "patcher_default_value").write_text(str(default_value))
         (value_work_dir / "patcher_range_min").write_text(str(range_min))
         (value_work_dir / "patcher_range_max").write_text(str(range_max))
         (value_work_dir / "patcher_patch_old").write_text(patch_old_set)
@@ -289,7 +297,7 @@ def process_int_type(flag, range_min, range_max, feature_name, general_desc, val
         shutil.rmtree(value_work_dir)
         print(f"    Created: {value_zip.name}")
 
-    # Create disabler zip (sets value to -1)
+    # Create disabler zip (sets value to range_min/default state)
     disable_zip = output_dir / f"Floppy_{feature_name}-disabler-{date}.zip"
     disable_work_dir = script_dir / "out" / f"disable_{flag}"
     if disable_work_dir.exists():
@@ -303,17 +311,19 @@ def process_int_type(flag, range_min, range_max, feature_name, general_desc, val
         ['out', 'patcher_zips', 'generate_patchers.sh', 'generate_patchers.py', 'features.txt']
     )
 
-    # Generate hex patch values for disable (flag=N -> flag=-1)
+    # Generate hex patch values for disable (flag=N -> flag=range_min)
     # Note: The patcher will try all values in the range dynamically
     # This is just a default starting point; the patcher handles the actual range
     patch_old_disable = generate_hex_patch(f"{flag}=0")
-    patch_new_disable = generate_hex_patch(f"{flag}=-1")
+    patch_new_disable = generate_hex_patch(f"{flag}={range_min}")
 
     # Create action, feature, and patch files
     (disable_work_dir / "patcher_action").write_text("disable")
     (disable_work_dir / "patcher_feature").write_text(flag)
     (disable_work_dir / "patcher_feature_name").write_text(feature_name)
     (disable_work_dir / "patcher_general_desc").write_text(general_desc)
+    (disable_work_dir / "patcher_default_value").write_text(str(default_value))
+    (disable_work_dir / "patcher_value").write_text(str(range_min))
     (disable_work_dir / "patcher_range_min").write_text(str(range_min))
     (disable_work_dir / "patcher_range_max").write_text(str(range_max))
     (disable_work_dir / "patcher_patch_old").write_text(patch_old_disable)
@@ -366,6 +376,7 @@ def main():
     current_general_desc = None
     current_range_min = None
     current_range_max = None
+    current_default_value = None
     int_values = []
 
     # Read and parse features.txt
@@ -383,6 +394,7 @@ def main():
                 if current_type == 'int' and int_values:
                     process_int_type(
                         current_flag, current_range_min, current_range_max,
+                        current_default_value,
                         current_feature_name, current_general_desc, int_values,
                         script_dir, patcher_template, output_dir, date
                     )
@@ -399,11 +411,20 @@ def main():
                 parts = [p.strip() for p in rest.split('|')]
                 if len(parts) >= 2:
                     flag = parts[0]
-                    feature_name = parts[1]
-                    comment = parts[2] if len(parts) > 2 else ""
+                    default_value = 0
+                    feature_name_index = 1
+                    if len(parts) > 1 and parts[1].startswith('default:'):
+                        try:
+                            default_value = int(parts[1][8:].strip())
+                            feature_name_index = 2
+                        except ValueError:
+                            print(f"ERROR: Invalid default specification for bool type: {parts[1]}", file=sys.stderr)
+                            sys.exit(1)
+                    feature_name = parts[feature_name_index] if len(parts) > feature_name_index else ""
+                    comment = parts[feature_name_index + 1] if len(parts) > feature_name_index + 1 else ""
                     if flag and feature_name:
                         process_bool_type(
-                            flag, feature_name, comment,
+                            flag, feature_name, comment, default_value,
                             script_dir, patcher_template, output_dir, date
                         )
                 current_type = None
@@ -413,6 +434,7 @@ def main():
                 if current_type == 'int' and int_values:
                     process_int_type(
                         current_flag, current_range_min, current_range_max,
+                        current_default_value,
                         current_feature_name, current_general_desc, int_values,
                         script_dir, patcher_template, output_dir, date
                     )
@@ -443,6 +465,7 @@ def main():
                 if current_type == 'int' and int_values:
                     process_int_type(
                         current_flag, current_range_min, current_range_max,
+                        current_default_value,
                         current_feature_name, current_general_desc, int_values,
                         script_dir, patcher_template, output_dir, date
                     )
@@ -460,8 +483,17 @@ def main():
                 if len(parts) >= 3:
                     flag = parts[0]
                     range_spec = parts[1]
-                    feature_name = parts[2]
-                    general_desc = parts[3] if len(parts) > 3 else ""
+                    default_value = 0
+                    feature_name_index = 2
+                    if len(parts) > 2 and parts[2].startswith('default:'):
+                        try:
+                            default_value = int(parts[2][8:].strip())
+                            feature_name_index = 3
+                        except ValueError:
+                            print(f"ERROR: Invalid default specification for int type: {parts[2]}", file=sys.stderr)
+                            sys.exit(1)
+                    feature_name = parts[feature_name_index] if len(parts) > feature_name_index else ""
+                    general_desc = parts[feature_name_index + 1] if len(parts) > feature_name_index + 1 else ""
 
                     # Parse range: "range: min,max"
                     if range_spec.startswith('range:'):
@@ -478,6 +510,7 @@ def main():
                     current_flag = flag
                     current_feature_name = feature_name
                     current_general_desc = general_desc
+                    current_default_value = default_value
                     int_values = []
 
             elif line.startswith('valof:'):
@@ -493,6 +526,7 @@ def main():
                     if current_type == 'int' and int_values:
                         process_int_type(
                             current_flag, current_range_min, current_range_max,
+                            current_default_value,
                             current_feature_name, current_general_desc, int_values,
                             script_dir, patcher_template, output_dir, date
                         )
@@ -511,7 +545,7 @@ def main():
                         comment = parts[2] if len(parts) > 2 else ""
                         if flag and feature_name:
                             process_bool_type(
-                                flag, feature_name, comment,
+                                flag, feature_name, comment, 0,
                                 script_dir, patcher_template, output_dir, date
                             )
 
@@ -519,6 +553,7 @@ def main():
     if current_type == 'int' and int_values:
         process_int_type(
             current_flag, current_range_min, current_range_max,
+            current_default_value,
             current_feature_name, current_general_desc, int_values,
             script_dir, patcher_template, output_dir, date
         )
