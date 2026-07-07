@@ -6,21 +6,16 @@
 ### AnyKernel setup
 # global properties
 properties() { '
-kernel.string=FloppyKernel Feature Patcher
+kernel.string=FloppyKernel Feature Patcher (Exynos 2100)
 do.devicecheck=1
 do.modules=0
 do.systemless=0
 do.cleanup=1
 do.cleanuponabort=0
-device.name1=a25x
-device.name2=a53x
-device.name3=a33x
-device.name4=m33x
-device.name5=m34x
-device.name6=gta4xls
-device.name7=gta4xlswifi
-device.name8=f34x
-device.name9=a26xs
+device.name1=r9s
+device.name2=o1s
+device.name3=p3s
+device.name4=t2s
 supported.versions=12.0-16.0
 supported.patchlevels=
 supported.vendorpatchlevels=

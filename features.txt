@@ -1,15 +1,14 @@
-int: superfloppy | range: -1,127 | Unlocked | CPU/GPU clock tweaks for Floppy1280.
-valof: superfloppy | 1 | Enabler | CL0 2.2 GHz / CL1 2.496 GHz, GPU 1.209 GHz, UV disabled by default.
-valof: superfloppy | 2 | Enabler_MegaFloppy | CL0 2.2 GHz / CL1 2.6 GHz, GPU 1.209 GHz, UV disabled by default.
-valof: superfloppy | 3 | Enabler_UltraFloppy | CL0 2.2 GHz / CL1 2.704 GHz, GPU 1.209 GHz, UV disabled by default.
-valof: superfloppy | 4 | Enabler_CoolFloppy | CL1 capped 2.112 GHz (better efficiency/thermals), GPU stock, UV enabled by default.
-valof: superfloppy | 5 | Enabler_BalancedFloppy | CL0 2.2 GHz (OC), CL1 stock 2.4 GHz, GPU stock, UV disabled by default.
+int: uname_bpf_spoof | range: 0,2 | default: 0 | BpfSpoof | Spoof the reported kernel version for BPF-based checks.
+valof: uname_bpf_spoof | 1 | Partial | Report only the spoofed release string.
+valof: uname_bpf_spoof | 2 | Full | Report the full spoofed uname version.
 
-bool: force_perm | Permissive | Force SELinux permissive mode.
+bool: mass_storage_hack | default: 0 | MassStorageHack | Enable the mass storage init.rc hook.
 
-bool: ems_efficient | EMSefficient | Enable EMS efficient mode.
+bool: usb_sl_disable | default: 0 | DisableUSBSL | Forcefully disable USB Secure Lock.
 
-select: mali.version | MaliVersion | Mali KMD version selector
-valof: mali.version | r32p1 | r32p1 | Mali r32p1 KMD
-valof: mali.version | r38p1 | r38p1 | Mali r38p1 KMD (default)
-valof: mali.version | r44p1 | r44p1 | Mali r44p1 KMD
+int: selinux_mode | range: 0,2 | default: 0 | SELinuxMode | Force SELinux mode.
+valof: selinux_mode | 1 | AlwaysEnforcing | Keep SELinux enforcing at all times.
+valof: selinux_mode | 2 | AlwaysPermissive | Keep SELinux permissive at all times.
+
+int: init_protection | range: 0,1 | default: 1 | InitProtection | Control init and throttlers protection.
+valof: init_protection | 1 | Enabled | Keep init and throttlers protection enabled.
