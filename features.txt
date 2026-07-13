@@ -12,3 +12,5 @@ valof: selinux_mode | 2 | AlwaysPermissive | Keep SELinux permissive at all time
 
 int: init_protection | range: 0,1 | default: 1 | InitProtection | Control init and throttlers protection.
 valof: init_protection | 1 | Enabled | Keep init and throttlers protection enabled.
+
+bool: init_debug | default: 0 | InitDebug | Enable debug logcat logging to /cache/logcat.txt
