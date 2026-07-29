@@ -46,7 +46,59 @@ print_blank_once() {
 }
 log_rom()  { print_blank_once; ui_print "[ROM] $1"; }
 log_feat() { print_blank_once; ui_print "[FK]  $1"; }
+log_part() { print_blank_once; ui_print "[DTB] $1"; }
 log_warn() { print_blank_once; ui_print "[!]   $1"; }
+
+# Unified package support
+ak3_device="$(getprop ro.product.vendor.device 2>/dev/null | tr -d '\r \n')";
+[ -z "$ak3_device" ] && ak3_device="$(getprop ro.product.device 2>/dev/null | tr -d '\r \n')";
+[ -z "$ak3_device" ] && ak3_device="$(getprop ro.build.product 2>/dev/null | tr -d '\r \n')";
+if [ -z "$ak3_device" ]; then
+  ak3_device="$(file_getprop /default.prop ro.product.vendor.device 2>/dev/null | tr -d '\r \n')";
+  [ -z "$ak3_device" ] && ak3_device="$(file_getprop /default.prop ro.product.device 2>/dev/null | tr -d '\r \n')";
+  [ -z "$ak3_device" ] && ak3_device="$(file_getprop /system/build.prop ro.product.vendor.device 2>/dev/null | tr -d '\r \n')";
+  [ -z "$ak3_device" ] && ak3_device="$(file_getprop /system/build.prop ro.product.device 2>/dev/null | tr -d '\r \n')";
+  [ -z "$ak3_device" ] && ak3_device="$(file_getprop /vendor/build.prop ro.product.vendor.device 2>/dev/null | tr -d '\r \n')";
+fi
+ak3_device="$(echo "$ak3_device" | tr '[:upper:]' '[:lower:]')";
+
+case "$ak3_device" in
+  *r9s*)
+    log_part "Selecting r9s DTBO";
+    if [ -f "$AKHOME/dtbo_r9s.img" ]; then
+      cp -f "$AKHOME/dtbo_r9s.img" "$AKHOME/dtbo.img";
+    else
+      abort "r9s device detected but dtbo_r9s.img not present in zip. Aborting...";
+    fi;
+    ;;
+  *o1s*)
+    log_part "Selecting o1s DTBO";
+    if [ -f "$AKHOME/dtbo_o1s.img" ]; then
+      cp -f "$AKHOME/dtbo_o1s.img" "$AKHOME/dtbo.img";
+    else
+      abort "o1s device detected but dtbo_o1s.img not present in zip. Aborting...";
+    fi;
+    ;;
+  *p3s*)
+    log_part "Selecting p3s DTBO";
+    if [ -f "$AKHOME/dtbo_p3s.img" ]; then
+      cp -f "$AKHOME/dtbo_p3s.img" "$AKHOME/dtbo.img";
+    else
+      abort "p3s device detected but dtbo_p3s.img not present in zip. Aborting...";
+    fi;
+    ;;
+  *t2s*)
+    log_part "Selecting t2s DTBO";
+    if [ -f "$AKHOME/dtbo_t2s.img" ]; then
+      cp -f "$AKHOME/dtbo_t2s.img" "$AKHOME/dtbo.img";
+    else
+      abort "t2s device detected but dtbo_t2s.img not present in zip. Aborting...";
+    fi;
+    ;;
+  *)
+    log_warn "Unknown device codename: $ak3_device, skipping DTBO selection";
+    ;;
+esac;
 
 # Keep legacy aliases used by check_bpf_spoofing
 feature_ok()   { log_feat "$1"; }
@@ -428,3 +480,4 @@ flash_boot; # use flash_boot to skip ramdisk repack, e.g. for devices with init_
 ## end boot install
 
 flash_generic vendor_boot;
+flash_dtbo;
