@@ -290,6 +290,50 @@ apply_dma_buf_env() {
   $BIN/magiskboot hexpatch "$AKHOME/Image" "$hex_1" "$target_hex" >/dev/null 2>&1
 }
 
+apply_mali_version() {
+  local target=$1
+  local new_hex mode_name
+
+  case "$target" in
+    r38p0) new_hex="6d616c692e76657273696f6e3d7233387030"; mode_name="r38p0" ;;
+    r38p1) new_hex="6d616c692e76657273696f6e3d7233387031"; mode_name="r38p1" ;;
+    r44p1) new_hex="6d616c692e76657273696f6e3d7234347031"; mode_name="r44p1" ;;
+    *) return 1 ;;
+  esac
+
+  [ -f "$AKHOME/Image" ] || return 0
+
+  log_feat "Mali version: restoring $mode_name"
+
+  patch_success=0
+  for old_val in r38p0 r38p1 r44p1; do
+    [ "$old_val" = "$target" ] && continue
+
+    case "$old_val" in
+      r38p0) old_hex="6d616c692e76657273696f6e3d7233387030" ;;
+      r38p1) old_hex="6d616c692e76657273696f6e3d7233387031" ;;
+      r44p1) old_hex="6d616c692e76657273696f6e3d7234347031" ;;
+    esac
+
+    $BIN/magiskboot hexpatch "$AKHOME/Image" "$old_hex" "$new_hex" 2>/dev/null
+    if [ $? -eq 0 ]; then
+      log_feat "mali.version: patched ($old_val -> $target)"
+      patch_success=1
+      break
+    fi
+  done
+
+  if [ "$patch_success" -eq 0 ]; then
+    new_bin=$(echo "$new_hex" | xxd -r -p 2>/dev/null)
+    if [ -n "$new_bin" ] && grep -qF "$new_bin" "$AKHOME/Image" 2>/dev/null; then
+      log_feat "mali.version: already set to $mode_name"
+    else
+      log_warn "mali.version: hex patch failed! Aborting installation."
+      exit 1
+    fi
+  fi
+}
+
 check_bpf_spoofing() {
   if [ ! -f "$AKHOME/bpf_spoof.conf" ]; then
     return 0
@@ -404,6 +448,7 @@ else
 fi
 
 # Check for feature flags in /cache/fk_feat
+mali_version=""
 if [ "$cache_mounted" -eq 1 ] && [ -f /cache/fk_feat ]; then
   if grep -q "uname_bpf_spoof=" /cache/fk_feat 2>/dev/null; then
     val=$(grep -o 'uname_bpf_spoof=[0-9]*' /cache/fk_feat | head -n1 | cut -d= -f2)
@@ -499,6 +544,16 @@ if [ "$cache_mounted" -eq 1 ] && [ -f /cache/fk_feat ]; then
     log_feat "DMA-BUF env: enabled"
     apply_dma_buf_env 1
   fi
+
+  mali_version_line=$(grep "^mali.version=" /cache/fk_feat 2>/dev/null | head -1)
+  if [ -n "$mali_version_line" ]; then
+    mali_version=$(echo "$mali_version_line" | cut -d'=' -f2)
+  fi
+fi
+
+# Restore mali.version if saved in /cache/fk_feat
+if [ -n "$mali_version" ]; then
+  apply_mali_version "$mali_version"
 fi
 
 # Detect ROM type and patch aosp_mode accordingly
