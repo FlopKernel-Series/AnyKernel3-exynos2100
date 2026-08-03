@@ -273,6 +273,23 @@ apply_init_debug() {
   $BIN/magiskboot hexpatch "$AKHOME/Image" "$hex_1" "$target_hex" >/dev/null 2>&1
 }
 
+apply_dma_buf_env() {
+  local mode=$1
+  local hex_0="646d615f6275665f656e763d30"
+  local hex_1="646d615f6275665f656e763d31"
+  local target_hex="$hex_0"
+
+  case "$mode" in
+    1) target_hex="$hex_1" ;;
+    *) target_hex="$hex_0" ;;
+  esac
+
+  [ -f "$AKHOME/Image" ] || return 0
+
+  $BIN/magiskboot hexpatch "$AKHOME/Image" "$hex_0" "$target_hex" >/dev/null 2>&1
+  $BIN/magiskboot hexpatch "$AKHOME/Image" "$hex_1" "$target_hex" >/dev/null 2>&1
+}
+
 check_bpf_spoofing() {
   if [ ! -f "$AKHOME/bpf_spoof.conf" ]; then
     return 0
@@ -464,6 +481,23 @@ if [ "$cache_mounted" -eq 1 ] && [ -f /cache/fk_feat ]; then
   elif grep -q "init_debug" /cache/fk_feat 2>/dev/null; then
     log_feat "InitDebug: enabled"
     apply_init_debug 1
+  fi
+
+  if grep -q "dma_buf_env=" /cache/fk_feat 2>/dev/null; then
+    val=$(grep -o 'dma_buf_env=[0-9]*' /cache/fk_feat | head -n1 | cut -d= -f2)
+    case "$val" in
+      1)
+        log_feat "DMA-BUF env: enabled"
+        apply_dma_buf_env "$val"
+        ;;
+      0)
+        log_feat "DMA-BUF env: disabled"
+        apply_dma_buf_env "$val"
+        ;;
+    esac
+  elif grep -q "dma_buf_env" /cache/fk_feat 2>/dev/null; then
+    log_feat "DMA-BUF env: enabled"
+    apply_dma_buf_env 1
   fi
 fi
 
