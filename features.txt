@@ -14,3 +14,5 @@ int: init_protection | range: 0,1 | default: 1 | InitProtection | Control init a
 valof: init_protection | 1 | Enabled | Keep init and throttlers protection enabled.
 
 bool: init_debug | default: 0 | InitDebug | Enable debug logcat logging to /cache/logcat.txt
+
+bool: dma_buf_env | default: 0 | DmaBufEnv | Use the DMA-BUF allocator instead of ION.
