@@ -201,15 +201,25 @@ check_usb_aoffload_support() {
   fi
 
   if [ -n "$lib_audioproxy" ] && strings "$lib_audioproxy" 2>/dev/null | grep -q "audio_hw_proxy_usb"; then
-    log_rom "USB Audio Offload: HAL support detected"
-  else
-    log_rom "USB Audio Offload: unsupported by HAL"
-    apply_usb_aoffload_disable 1
-    if [ $? -eq 0 ]; then
-      log_feat "usb_aoffload_disable: patched (0 -> 1)"
-    else
-      log_warn "usb_aoffload_disable: hex patch failed!"
+    log_rom "USB Audio Offload: HAL support detected (libaudioproxy)"
+    return 0
+  fi
+
+  # Check other names just in case
+  local f
+  for f in /vendor/lib64/*audio*.so /vendor/lib/*audio*.so /vendor/lib64/hw/audio.primary.*.so /odm/lib64/*audio*.so; do
+    if [ -f "$f" ] && strings "$f" 2>/dev/null | grep -q "audio_hw_proxy_usb"; then
+      log_rom "USB Audio Offload: HAL support detected ($(basename "$f"))"
+      return 0
     fi
+  done
+
+  log_rom "USB Audio Offload: unsupported by HAL"
+  apply_usb_aoffload_disable 1
+  if [ $? -eq 0 ]; then
+    log_feat "usb_aoffload_disable: patched (0 -> 1)"
+  else
+    log_warn "usb_aoffload_disable: hex patch failed!"
   fi
 }
 
