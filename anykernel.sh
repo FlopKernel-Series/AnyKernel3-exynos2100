@@ -105,6 +105,64 @@ feature_ok()   { log_feat "$1"; }
 feature_info() { log_feat "$1"; }
 feature_warn() { log_warn "$1"; }
 
+FK_FEAT=/cache/fk_feat
+FK_DEF=/vendor/etc/fkdef
+FK_VAL=""
+FK_SRC=""
+
+fk_cache_has() {
+  [ "$cache_mounted" = "1" ] && [ -f "$FK_FEAT" ] && grep -q "$1" "$FK_FEAT" 2>/dev/null
+}
+
+fk_def_has() {
+  [ -f "$FK_DEF" ] && grep -q "$1" "$FK_DEF" 2>/dev/null
+}
+
+fk_resolve_num() {
+  local key="$1" v=""
+  if [ "$cache_mounted" = "1" ] && [ -f "$FK_FEAT" ]; then
+    v=$(grep -o "${key}=[0-9]*" "$FK_FEAT" 2>/dev/null | head -n1 | cut -d= -f2)
+    if [ -n "$v" ]; then FK_VAL="$v"; FK_SRC="fk_feat"; return 0; fi
+  fi
+  if [ -f "$FK_DEF" ]; then
+    v=$(grep -o "${key}=[0-9]*" "$FK_DEF" 2>/dev/null | head -n1 | cut -d= -f2)
+    if [ -n "$v" ]; then FK_VAL="$v"; FK_SRC="fkdef"; return 0; fi
+  fi
+  return 1
+}
+
+fk_resolve_flag() {
+  local key="$1" bare_def="$2" v=""
+  if [ "$cache_mounted" = "1" ] && [ -f "$FK_FEAT" ] && grep -q "$key" "$FK_FEAT" 2>/dev/null; then
+    v=$(grep -o "${key}=[0-9]*" "$FK_FEAT" 2>/dev/null | head -n1 | cut -d= -f2)
+    if [ -n "$v" ]; then FK_VAL="$v"; else FK_VAL="$bare_def"; fi
+    FK_SRC="fk_feat"
+    return 0
+  fi
+  if [ -f "$FK_DEF" ] && grep -q "$key" "$FK_DEF" 2>/dev/null; then
+    v=$(grep -o "${key}=[0-9]*" "$FK_DEF" 2>/dev/null | head -n1 | cut -d= -f2)
+    if [ -n "$v" ]; then FK_VAL="$v"; else FK_VAL="$bare_def"; fi
+    FK_SRC="fkdef"
+    return 0
+  fi
+  return 1
+}
+
+fk_resolve_str() {
+  local key="$1" v=""
+  if [ "$cache_mounted" = "1" ] && [ -f "$FK_FEAT" ]; then
+    v=$(grep "^${key}=" "$FK_FEAT" 2>/dev/null | head -n1 | cut -d= -f2)
+    if [ -n "$v" ]; then FK_VAL="$v"; FK_SRC="fk_feat"; return 0; fi
+  fi
+  if [ -f "$FK_DEF" ]; then
+    v=$(grep "^${key}=" "$FK_DEF" 2>/dev/null | head -n1 | cut -d= -f2)
+    if [ -n "$v" ]; then FK_VAL="$v"; FK_SRC="fkdef"; return 0; fi
+  fi
+  return 1
+}
+
+fk_tag() { [ "$FK_SRC" = "fkdef" ] && echo " (fkdef)" || echo ""; }
+
 apply_bpf_spoof() {
   local mode=$1
   local hex_0="756e616d655f6270665f73706f6f663d30"
@@ -185,10 +243,9 @@ apply_usb_aoffload_disable() {
 }
 
 check_usb_aoffload_support() {
-  if [ "$cache_mounted" -eq 1 ] && [ -f /cache/fk_feat ] && \
-     grep -q "usb_aoffload_disable=" /cache/fk_feat 2>/dev/null; then
-    val=$(grep -o 'usb_aoffload_disable=[0-9]*' /cache/fk_feat | head -n1 | cut -d= -f2)
-    log_rom "USB Audio Offload: override (usb_aoffload_disable=$val)"
+  if fk_resolve_num "usb_aoffload_disable"; then
+    val="$FK_VAL"
+    log_rom "USB Audio Offload: override (usb_aoffload_disable=$val$(fk_tag))"
     apply_usb_aoffload_disable "$val"
     return 0
   fi
@@ -224,10 +281,9 @@ check_usb_aoffload_support() {
 }
 
 detect_aosp_mode() {
-  if [ "$cache_mounted" -eq 1 ] && [ -f /cache/fk_feat ] && \
-     grep -q "aosp_mode=" /cache/fk_feat 2>/dev/null; then
-    val=$(grep -o 'aosp_mode=[0-9]*' /cache/fk_feat | head -n1 | cut -d= -f2)
-    log_rom "Vendor type: override (aosp_mode=$val)"
+  if fk_resolve_num "aosp_mode"; then
+    val="$FK_VAL"
+    log_rom "Vendor type: override (aosp_mode=$val$(fk_tag))"
     apply_aosp_mode "$val"
     if [ "$val" -eq 1 ]; then
       check_usb_aoffload_support
@@ -395,8 +451,8 @@ check_bpf_spoofing() {
     return 0
   fi
 
-  if [ "$cache_mounted" -eq 1 ] && [ -f /cache/fk_feat ] && grep -q "uname_bpf_spoof" /cache/fk_feat 2>/dev/null; then
-    log_feat "BPF spoof: already set in fk_feat, skipping detection"
+  if fk_cache_has "uname_bpf_spoof" || fk_def_has "uname_bpf_spoof"; then
+    log_feat "BPF spoof: already set in fk_feat/fkdef, skipping detection"
     return 0
   fi
 
@@ -503,111 +559,104 @@ else
   fi
 fi
 
-# Check for feature flags in /cache/fk_feat
-mali_version=""
-if [ "$cache_mounted" -eq 1 ] && [ -f /cache/fk_feat ]; then
-  if grep -q "uname_bpf_spoof=" /cache/fk_feat 2>/dev/null; then
-    val=$(grep -o 'uname_bpf_spoof=[0-9]*' /cache/fk_feat | head -n1 | cut -d= -f2)
-    log_feat "BPF spoof: mode $val"
-    apply_bpf_spoof "$val"
-  elif grep -q "uname_bpf_spoof" /cache/fk_feat 2>/dev/null; then
-    log_feat "BPF spoof: mode 1"
-    apply_bpf_spoof 1
-  fi
-
-  if grep -q "mass_storage_hack=" /cache/fk_feat 2>/dev/null; then
-    val=$(grep -o 'mass_storage_hack=[0-9]*' /cache/fk_feat | head -n1 | cut -d= -f2)
-    if [ "$val" = "1" ]; then
-      log_feat "Mass storage hack: enabled"
-    else
-      log_feat "Mass storage hack: disabled"
-    fi
-    apply_mass_storage_hack "$val"
-  elif grep -q "mass_storage_hack" /cache/fk_feat 2>/dev/null; then
-    log_feat "Mass storage hack: enabled"
-    apply_mass_storage_hack 1
-  fi
-
-  if grep -q "selinux_mode=" /cache/fk_feat 2>/dev/null; then
-    val=$(grep -o 'selinux_mode=[0-9]*' /cache/fk_feat | head -n1 | cut -d= -f2)
-    case "$val" in
-      1)
-        log_feat "SELinux mode: always enforcing"
-        apply_selinux_mode "$val"
-        ;;
-      2)
-        log_feat "SELinux mode: always permissive"
-        apply_selinux_mode "$val"
-        ;;
-    esac
-  fi
-
-  if grep -q "init_protection=" /cache/fk_feat 2>/dev/null; then
-    val=$(grep -o 'init_protection=[0-9]*' /cache/fk_feat | head -n1 | cut -d= -f2)
-    case "$val" in
-      0)
-        log_feat "Init protection: disabled"
-        apply_init_protection "$val"
-        ;;
-      1)
-        apply_init_protection "$val"
-        ;;
-    esac
-  fi
-
-  if grep -q "usb_sl_disable=" /cache/fk_feat 2>/dev/null; then
-    val=$(grep -o 'usb_sl_disable=[0-9]*' /cache/fk_feat | head -n1 | cut -d= -f2)
-    case "$val" in
-      1)
-        log_feat "USB SL Disable: override"
-        apply_usb_sl_disable "$val"
-        ;;
-      0)
-        apply_usb_sl_disable "$val"
-        ;;
-    esac
-  fi
-
-  if grep -q "init_debug=" /cache/fk_feat 2>/dev/null; then
-    val=$(grep -o 'init_debug=[0-9]*' /cache/fk_feat | head -n1 | cut -d= -f2)
-    case "$val" in
-      1)
-        log_feat "InitDebug: enabled"
-        apply_init_debug "$val"
-        ;;
-      0)
-        apply_init_debug "$val"
-        ;;
-    esac
-  elif grep -q "init_debug" /cache/fk_feat 2>/dev/null; then
-    log_feat "InitDebug: enabled"
-    apply_init_debug 1
-  fi
-
-  if grep -q "dma_buf_env=" /cache/fk_feat 2>/dev/null; then
-    val=$(grep -o 'dma_buf_env=[0-9]*' /cache/fk_feat | head -n1 | cut -d= -f2)
-    case "$val" in
-      1)
-        log_feat "DMA-BUF env: enabled"
-        apply_dma_buf_env "$val"
-        ;;
-      0)
-        log_feat "DMA-BUF env: disabled"
-        apply_dma_buf_env "$val"
-        ;;
-    esac
-  elif grep -q "dma_buf_env" /cache/fk_feat 2>/dev/null; then
-    log_feat "DMA-BUF env: enabled"
-    apply_dma_buf_env 1
-  fi
-
-  mali_version_line=$(grep "^mali.version=" /cache/fk_feat 2>/dev/null | head -1)
-  if [ -n "$mali_version_line" ]; then
-    mali_version=$(echo "$mali_version_line" | cut -d'=' -f2)
-  fi
+# Check for feature flags in /cache/fk_feat and /vendor/etc/fkdef
+if ! grep -q ' /vendor ' /proc/mounts 2>/dev/null; then
+  mount -o ro /vendor 2>/dev/null || mount -o ro /dev/block/mapper/vendor /vendor 2>/dev/null
 fi
 
-# Restore mali.version if saved in /cache/fk_feat
+if [ -f "$FK_DEF" ]; then
+  log_rom "ROM defaults: $FK_DEF detected"
+fi
+
+mali_version=""
+if fk_resolve_flag "uname_bpf_spoof" 1; then
+  val="$FK_VAL"
+  log_feat "BPF spoof: mode $val$(fk_tag)"
+  apply_bpf_spoof "$val"
+fi
+
+if fk_resolve_flag "mass_storage_hack" 1; then
+  val="$FK_VAL"
+  if [ "$val" = "1" ]; then
+    log_feat "Mass storage hack: enabled$(fk_tag)"
+  else
+    log_feat "Mass storage hack: disabled$(fk_tag)"
+  fi
+  apply_mass_storage_hack "$val"
+fi
+
+if fk_resolve_num "selinux_mode"; then
+  val="$FK_VAL"
+  case "$val" in
+    1)
+      log_feat "SELinux mode: always enforcing$(fk_tag)"
+      apply_selinux_mode "$val"
+      ;;
+    2)
+      log_feat "SELinux mode: always permissive$(fk_tag)"
+      apply_selinux_mode "$val"
+      ;;
+  esac
+fi
+
+if fk_resolve_num "init_protection"; then
+  val="$FK_VAL"
+  case "$val" in
+    0)
+      log_feat "Init protection: disabled$(fk_tag)"
+      apply_init_protection "$val"
+      ;;
+    1)
+      apply_init_protection "$val"
+      ;;
+  esac
+fi
+
+if fk_resolve_num "usb_sl_disable"; then
+  val="$FK_VAL"
+  case "$val" in
+    1)
+      log_feat "USB SL Disable: override$(fk_tag)"
+      apply_usb_sl_disable "$val"
+      ;;
+    0)
+      apply_usb_sl_disable "$val"
+      ;;
+  esac
+fi
+
+if fk_resolve_flag "init_debug" 1; then
+  val="$FK_VAL"
+  case "$val" in
+    1)
+      log_feat "InitDebug: enabled$(fk_tag)"
+      apply_init_debug "$val"
+      ;;
+    0)
+      apply_init_debug "$val"
+      ;;
+  esac
+fi
+
+if fk_resolve_flag "dma_buf_env" 1; then
+  val="$FK_VAL"
+  case "$val" in
+    1)
+      log_feat "DMA-BUF env: enabled$(fk_tag)"
+      apply_dma_buf_env "$val"
+      ;;
+    0)
+      log_feat "DMA-BUF env: disabled$(fk_tag)"
+      apply_dma_buf_env "$val"
+      ;;
+  esac
+fi
+
+if fk_resolve_str "mali.version"; then
+  mali_version="$FK_VAL"
+fi
+
+# Restore mali.version if saved in /cache/fk_feat or /vendor/etc/fkdef
 if [ -n "$mali_version" ]; then
   apply_mali_version "$mali_version"
 fi
