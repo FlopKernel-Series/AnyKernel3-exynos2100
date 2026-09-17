@@ -400,6 +400,26 @@ apply_dma_buf_env() {
   $BIN/magiskboot hexpatch "$AKHOME/Image" "$hex_1" "$target_hex" >/dev/null 2>&1
 }
 
+apply_default_sbwc_mode() {
+  local mode=$1
+  local hex_0="64656661756c745f736277635f6d6f64653d30"
+  local hex_1="64656661756c745f736277635f6d6f64653d31"
+  local hex_2="64656661756c745f736277635f6d6f64653d32"
+  local target_hex="$hex_0"
+
+  case "$mode" in
+    1) target_hex="$hex_1" ;;
+    2) target_hex="$hex_2" ;;
+    *) target_hex="$hex_0" ;;
+  esac
+
+  [ -f "$AKHOME/Image" ] || return 0
+
+  $BIN/magiskboot hexpatch "$AKHOME/Image" "$hex_0" "$target_hex" >/dev/null 2>&1
+  $BIN/magiskboot hexpatch "$AKHOME/Image" "$hex_1" "$target_hex" >/dev/null 2>&1
+  $BIN/magiskboot hexpatch "$AKHOME/Image" "$hex_2" "$target_hex" >/dev/null 2>&1
+}
+
 apply_mali_version() {
   local target=$1
   local new_hex mode_name
@@ -648,6 +668,23 @@ if fk_resolve_flag "dma_buf_env" 1; then
     0)
       log_feat "DMA-BUF env: disabled$(fk_tag)"
       apply_dma_buf_env "$val"
+      ;;
+  esac
+fi
+
+if fk_resolve_num "default_sbwc_mode"; then
+  val="$FK_VAL"
+  case "$val" in
+    1)
+      log_feat "SBWC mode: SBWC disabled, SBWCL enabled$(fk_tag)"
+      apply_default_sbwc_mode "$val"
+      ;;
+    2)
+      log_feat "SBWC mode: SBWC/SBWCL disabled$(fk_tag)"
+      apply_default_sbwc_mode "$val"
+      ;;
+    0)
+      apply_default_sbwc_mode "$val"
       ;;
   esac
 fi
