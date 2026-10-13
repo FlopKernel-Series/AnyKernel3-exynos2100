@@ -400,6 +400,23 @@ apply_dma_buf_env() {
   $BIN/magiskboot hexpatch "$AKHOME/Image" "$hex_1" "$target_hex" >/dev/null 2>&1
 }
 
+apply_panel_legacy_mode() {
+  local mode=$1
+  local hex_0="70616e656c5f6c65676163795f6d6f64653d30"
+  local hex_1="70616e656c5f6c65676163795f6d6f64653d31"
+  local target_hex="$hex_0"
+
+  case "$mode" in
+    1) target_hex="$hex_1" ;;
+    *) target_hex="$hex_0" ;;
+  esac
+
+  [ -f "$AKHOME/Image" ] || return 0
+
+  $BIN/magiskboot hexpatch "$AKHOME/Image" "$hex_0" "$target_hex" >/dev/null 2>&1
+  $BIN/magiskboot hexpatch "$AKHOME/Image" "$hex_1" "$target_hex" >/dev/null 2>&1
+}
+
 apply_default_sbwc_mode() {
   local mode=$1
   local hex_0="64656661756c745f736277635f6d6f64653d30"
@@ -654,6 +671,19 @@ if fk_resolve_flag "init_debug" 1; then
       ;;
     0)
       apply_init_debug "$val"
+      ;;
+  esac
+fi
+
+if fk_resolve_flag "panel_legacy_mode" 1; then
+  val="$FK_VAL"
+  case "$val" in
+    1)
+      log_feat "Panel legacy mode: enabled$(fk_tag)"
+      apply_panel_legacy_mode "$val"
+      ;;
+    0)
+      apply_panel_legacy_mode "$val"
       ;;
   esac
 fi
