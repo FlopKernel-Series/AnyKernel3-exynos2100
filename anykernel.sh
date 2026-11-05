@@ -445,6 +445,8 @@ apply_mali_version() {
     r38p0) new_hex="6d616c692e76657273696f6e3d7233387030"; mode_name="r38p0" ;;
     r38p1) new_hex="6d616c692e76657273696f6e3d7233387031"; mode_name="r38p1" ;;
     r44p1) new_hex="6d616c692e76657273696f6e3d7234347031"; mode_name="r44p1" ;;
+    r49p1) new_hex="6d616c692e76657273696f6e3d7234397031"; mode_name="r49p1" ;;
+    r54p1) new_hex="6d616c692e76657273696f6e3d7235347031"; mode_name="r54p1" ;;
     r54p3) new_hex="6d616c692e76657273696f6e3d7235347033"; mode_name="r54p3" ;;
     *) return 1 ;;
   esac
@@ -454,13 +456,15 @@ apply_mali_version() {
   log_feat "Mali version: restoring $mode_name"
 
   patch_success=0
-  for old_val in r38p0 r38p1 r44p1 r54p3; do
+  for old_val in r38p0 r38p1 r44p1 r49p1 r54p1 r54p3; do
     [ "$old_val" = "$target" ] && continue
 
     case "$old_val" in
       r38p0) old_hex="6d616c692e76657273696f6e3d7233387030" ;;
       r38p1) old_hex="6d616c692e76657273696f6e3d7233387031" ;;
       r44p1) old_hex="6d616c692e76657273696f6e3d7234347031" ;;
+      r49p1) old_hex="6d616c692e76657273696f6e3d7234397031" ;;
+      r54p1) old_hex="6d616c692e76657273696f6e3d7235347031" ;;
       r54p3) old_hex="6d616c692e76657273696f6e3d7235347033" ;;
     esac
 
