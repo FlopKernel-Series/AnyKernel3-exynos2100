@@ -437,6 +437,56 @@ apply_default_sbwc_mode() {
   $BIN/magiskboot hexpatch "$AKHOME/Image" "$hex_2" "$target_hex" >/dev/null 2>&1
 }
 
+apply_superfloppy() {
+  local mode=$1
+  local new_hex mode_name
+
+  # Hex values for superfloppy (hardcoded)
+  # 0: superfloppy=0 -> 7375706572666c6f7070793d30
+  # 1: superfloppy=1 -> 7375706572666c6f7070793d31
+  # 2: superfloppy=2 -> 7375706572666c6f7070793d32
+  # 3: superfloppy=3 -> 7375706572666c6f7070793d33
+
+  case "$mode" in
+    1) new_hex="7375706572666c6f7070793d31"; mode_name="Enabler (2.951 GHz)" ;;
+    2) new_hex="7375706572666c6f7070793d32"; mode_name="MegaFloppy (3.003 GHz)" ;;
+    3) new_hex="7375706572666c6f7070793d33"; mode_name="UltraFloppy (3.207 GHz)" ;;
+    *) return 1 ;;
+  esac
+
+  [ -f "$AKHOME/Image" ] || return 0
+
+  log_feat "Unlocked mode: setting superfloppy=$mode ($mode_name)"
+
+  patch_success=0
+  for old_val in 0 1 2 3; do
+    case "$old_val" in
+      0) old_hex="7375706572666c6f7070793d30" ;;
+      1) old_hex="7375706572666c6f7070793d31" ;;
+      2) old_hex="7375706572666c6f7070793d32" ;;
+      3) old_hex="7375706572666c6f7070793d33" ;;
+    esac
+
+    [ "$old_val" = "$mode" ] && continue
+
+    $BIN/magiskboot hexpatch "$AKHOME/Image" "$old_hex" "$new_hex" 2>/dev/null
+    if [ $? -eq 0 ]; then
+      log_feat "superfloppy: patched ($old_val -> $mode)"
+      patch_success=1
+      break
+    fi
+  done
+
+  if [ "$patch_success" -eq 0 ]; then
+    if hexdump -C "$AKHOME/Image" 2>/dev/null | grep -qi "$new_hex" 2>/dev/null; then
+      log_feat "superfloppy: already set to $mode"
+    else
+      log_warn "superfloppy: hex patch failed! Aborting installation."
+      exit 1
+    fi
+  fi
+}
+
 apply_mali_version() {
   local target=$1
   local new_hex mode_name
@@ -721,6 +771,21 @@ if fk_resolve_num "default_sbwc_mode"; then
       apply_default_sbwc_mode "$val"
       ;;
   esac
+fi
+
+superfloppy_mode=-1
+if fk_resolve_num "superfloppy"; then
+  superfloppy_mode="$FK_VAL"
+  if [ "$superfloppy_mode" != "1" ] && [ "$superfloppy_mode" != "2" ] && [ "$superfloppy_mode" != "3" ]; then
+    superfloppy_mode=-1
+  fi
+fi
+
+if [ "$superfloppy_mode" -ge 1 ] && [ "$superfloppy_mode" -le 3 ]; then
+  log_feat "Unlocked mode: enabled (mode $superfloppy_mode)"
+  apply_superfloppy "$superfloppy_mode"
+else
+  log_feat "Unlocked mode: disabled"
 fi
 
 if fk_resolve_str "mali.version"; then
