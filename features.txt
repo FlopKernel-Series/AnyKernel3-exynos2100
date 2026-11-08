@@ -19,6 +19,11 @@ bool: dma_buf_env | default: 0 | DmaBufEnv | Use the DMA-BUF allocator instead o
 
 bool: panel_legacy_mode | default: 0 | PanelLegacyMode | Use real 60/120Hz panel modes instead of HW TE SKIP.
 
+int: superfloppy | range: 0,3 | default: 0 | Unlocked | CPU/GPU clock tweaks for Floppy2100.
+valof: superfloppy | 1 | Enabler | CL1/CL2 2.951 GHz, GPU 949 MHz, UV disabled by default.
+valof: superfloppy | 2 | Enabler_MegaFloppy | CL1/CL2 3.003 GHz, GPU 949 MHz, UV disabled by default.
+valof: superfloppy | 3 | Enabler_UltraFloppy | CL1/CL2 3.207 GHz, GPU 949 MHz, UV disabled by default.
+
 select: mali.version | MaliVersion | Mali KMD version selector
 valof: mali.version | r38p0 | r38p0 | Mali r38p0 KMD
 valof: mali.version | r38p1 | r38p1 | Mali r38p1 KMD (default)
